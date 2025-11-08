@@ -1,0 +1,84 @@
+Usability: Best Practices
+
+Twyn turns natural language prompts into dynamic, agent-based simulations of real-world scenarios to simulate *possibilities*—not deliver static predictions. 
+
+The more you focus on describing the world and its pressures, the more you’ll discover patterns, dynamics, and insights you didn’t expect. 
+
+Here are best practices for writing strong prompts and structuring your scenarios:
+
+---
+
+### **1. Be Specific About the Scenario**
+
+Clearly define the situation you want to explore.
+
+Instead of asking broad or vague questions ("What happens next?"), describe a clear event, decision, or system shift you want the agents to react to.
+
+> 🧠 Good prompts focus on distinct triggers or changes, not general topics.
+> 
+
+---
+
+### **2. Identify Groups and Contexts**
+
+Mention key groups, organizations, or populations involved in the scenario.
+
+Who is reacting? What environment are they in? Social, political, cultural, or economic factors all matter.
+
+> 🧠 Simulations are richer when agents represent specific types of actors, not just "people" in general.
+> 
+
+---
+
+### **3. Include Timeframes (When Relevant)**
+
+If you want to see how things unfold over time, set a clear horizon:
+
+30 days, 6 months, multiple stages of change, etc.
+
+> 🧠 Adding a timeframe allows Twyn to model progression, escalation, or stabilization across agents.
+> 
+
+---
+
+### **4. Focus on Systems, Not Single Events**
+
+The best simulations explore systems of interaction—multiple forces, reactions, and feedback loops.
+
+Think about how decisions, behaviors, or narratives might cascade through groups.
+
+> 🧠 You’re not asking “what happens,” you’re exploring how and why behavior evolves.
+> 
+
+---
+
+### **5. Highlight Pressures, Incentives, or Conflicts**
+
+Simulations are most interesting when agents have to make trade-offs.
+
+Define some tension, incentives, or risks that create decision points.
+
+> 🧠 Emergent behavior needs friction—pressure points drive deeper, more realistic outcomes.
+> 
+
+---
+
+### **6. Avoid Over-Prescription**
+
+Don't try to script exactly what you want agents to do.
+
+Describe the setup and let the agents think, react, and adapt freely inside the environment you define.
+
+> 🧠 Twyn is about exploration, not confirmation. Leave space for surprise.
+> 
+
+---
+
+## Before You Submit a Prompt:
+
+- Is there a clear trigger or situation?
+- Are specific groups or actors involved?
+- Is the context (social, economic, cultural) described?
+- Is there an evolving system, not just a one-time event?
+- Are there natural tensions, incentives, or conflicts?
+- Did you leave room for emergent behavior instead of scripting outcomes?

@@ -1,0 +1,14 @@
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.4.2
+python-multipart>=0.0.6
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-dotenv>=1.0.0
+# Vision & Multimodality
+Pillow>=10.0.0           # Image processing
+PyPDF2>=3.0.0            # PDF parsing
+pdf2image>=1.16.0        # PDF to images
+pytesseract>=0.3.10      # OCR fallback
+pgvector>=0.2.3          # Vector embeddings
+supabase>=2.0.0          # Supabase client for storage 

@@ -1,0 +1,416 @@
+# Twyn Backend Overview
+
+## Project Description
+
+Twyn is an **agentic simulation engine** that creates and runs multi-agent simulations based on natural language prompts. The system uses AI agents to design simulations, run them, and analyze the results.
+
+---
+
+## Architecture Overview
+
+The system follows a **three-phase pipeline**:
+
+1. **Architect Phase** - Converts user prompts into simulation configurations
+2. **Simulator Phase** - Runs the configured simulation with AI agents
+3. **Analyst Phase** - Analyzes simulation results and generates reports
+
+---
+
+## Backend Structure (`twyn-backend/`)
+
+### Root Files
+
+- **`run.py`** - Entry point to start the FastAPI server with uvicorn
+- **`requirements.txt`** - Python dependencies (FastAPI, uvicorn, pydantic, etc.)
+- **`setup.py`** - Package setup configuration
+- **`schema.sql`** - Database schema (if applicable)
+- **`tasks.md`** - Development tasks and TODOs
+- **`API_Documentation.md`** - Comprehensive API documentation
+
+---
+
+## Directory Structure
+
+### `/src/api/` - FastAPI Backend API Layer
+
+The REST API layer that exposes the simulation engine to the frontend.
+
+#### Core API Files:
+
+- **`main.py`**
+  - FastAPI application setup
+  - CORS middleware configuration (reads from `ALLOWED_ORIGINS` env var)
+  - Routes registration
+  - Server entry point
+
+- **`config.py`**
+  - Settings and configuration management
+  - Environment variables loading (OpenRouter API credentials)
+  - Model configurations for different agents
+
+- **`deps.py`**
+  - Dependency injection functions
+  - Returns singleton `SimulationManager` instance
+
+- **`models.py`**
+  - Pydantic models for API requests/responses
+  - `SimulationState` - Core simulation state model
+  - `SimulationStatus` enum - Tracks simulation lifecycle states
+  - `SimulationTitle` - Title generation model
+
+- **`simulation_manager.py`** ⭐ **CRITICAL FILE**
+  - Central orchestrator for all simulations
+  - Manages simulation lifecycle and state
+  - Coordinates Architect → Simulator → Analyst pipeline
+  - Implements callback system for real-time updates
+  - Key methods:
+    - `add_simulation()` - Creates new simulation with AI-generated title
+    - `get_simulation()` - Retrieves simulation state
+    - `run_architect()` - Runs configuration generation
+    - `run_simulator()` - Executes simulation
+    - `run_analyst()` - Generates analysis report
+
+#### `/src/api/routes/` - API Endpoints
+
+- **`__init__.py`**
+  - Aggregates all route modules into single `api_router`
+
+- **`simulations.py`** ⭐ **MAIN ENDPOINT**
+  - `POST /simulations/` - Create new simulation
+  - `GET /simulations/{id}` - Get simulation state
+  - `GET /simulations/{id}/stream` - Stream real-time updates via SSE (Server-Sent Events)
+  - Implements heartbeat mechanism for long-running simulations
+
+- **`architect.py`**
+  - `POST /architect/{simulation_id}` - Trigger architect phase
+  - Runs configuration generation in background
+
+- **`simulator.py`**
+  - `POST /simulator/{simulation_id}` - Trigger simulator phase
+  - Runs simulation in background
+
+- **`analyst.py`**
+  - `POST /analyst/{simulation_id}` - Trigger analyst phase
+  - Runs analysis generation in background
+
+---
+
+### `/src/core/` - Core Business Logic
+
+Contains the three main agents and simulation engine.
+
+#### `/src/core/shared/` - Shared Utilities
+
+- **`agent.py`** ⭐ **BASE AGENT CLASS**
+  - Generic AI agent framework using OpenAI/Anthropic models
+  - Tool calling system (function calling)
+  - Context management and callbacks
+  - Message history management
+  - Supports prompt caching for Anthropic models
+  - `ContextCallback` protocol for real-time updates
+
+- **`models.py`**
+  - Shared Pydantic models for simulation configuration
+  - Variable types: `InitialValueVariable`, `UniformVariable`, `NormalVariable`, `CategoricalVariable`, `DerivedVariable`
+  - Action types: `TextAction`, `OptionAction`, `NumberAction`
+  - Schema generators for structured outputs
+
+- **`config_serializer.py`**
+  - Serialization/deserialization of simulation configs
+  - Converts between dict and typed objects
+
+#### `/src/core/architect/` - Configuration Generation Agent
+
+The "Architect" agent converts natural language prompts into valid simulation configurations.
+
+- **`architect.py`**
+  - Main entry point: `create_configuration()`
+  - Creates agent with specialized tools
+  - Validates configuration with retry loop
+  - Returns simulation config or error
+
+- **`prompts.py`** / **`prompt.xml`**
+  - System instructions for the architect agent
+  - Detailed rules for creating simulation configs
+  - Examples and best practices
+
+- **`tools.py`**
+  - Tool functions the architect can call:
+    - `initialize_simulation_parameters()` - Set step_unit, number_of_steps
+    - `add_agent_group()` - Create agent groups
+    - `add_variable()` - Add variables to agents
+    - `add_action()` - Add actions for agents
+    - `modify_*()` - Update existing elements
+    - `delete_*()` - Remove elements
+    - `search_web()` - Search for information online
+    - `think()` - Chain-of-thought reasoning
+
+- **`context.py`**
+  - `ArchitectContext` - Maintains state during configuration generation
+  - Stores: `config`, `sources` (web search results), `client` (OpenAI client)
+
+#### `/src/core/simulator/` - Simulation Execution Engine
+
+Runs the actual multi-agent simulation.
+
+- **`simulator.py`** ⭐ **SIMULATION ENGINE**
+  - `Simulator` class - Main simulation runner
+  - Key methods:
+    - `reset()` - Initialize agents and variables
+    - `step()` - Run one simulation step
+    - `validate()` - Validate configuration before running
+  - Agent initialization with variables and distributions
+  - Variable updates with custom rules
+  - Action generation via LLM calls
+  - Batch processing for efficiency
+  - Error handling and retries
+
+- **`mini_agent.py`**
+  - `MiniAgent` class - Individual agent in simulation
+  - `MiniAgentList` - Collection with special query methods
+  - Agent memory system for tracking history
+  - Dynamic attribute management
+
+- **`mini_agent_prompt.py`**
+  - Generates prompts for mini-agents during simulation
+  - Includes agent state, available actions, and decision context
+
+- **`provider.py`**
+  - `Provider` class - Handles LLM API calls
+  - Batch completion support
+  - Error handling and rate limiting
+  - Supports structured outputs
+
+#### `/src/core/analyst/` - Analysis & Reporting Agent
+
+Generates insights and reports from simulation data.
+
+- **`analyst.py`**
+  - Main entry point: `create_report()`
+  - Creates agent with analysis tools
+  - Generates markdown reports with plots
+
+- **`prompts.py`**
+  - System instructions for analyst agent
+  - Report structure guidelines
+  - Analysis best practices
+
+- **`tools.py`**
+  - Analysis-specific tools:
+    - `add_text()` - Add content to report
+    - `remove_text()` - Remove sections
+    - `replace_text()` - Update content
+    - `generate_plot()` - Create visualizations
+    - `search_web()` - Additional research
+    - `think()` - Reasoning tool
+
+- **`context.py`**
+  - `AnalystContext` - Maintains analysis state
+  - Stores: `analysis` (report text), `data`, `config`, `sources`
+
+#### `/src/core/analyst/visualization/` - Plot Generation
+
+- **`plot_creator.py`**
+  - Main plot generation coordinator
+  - Determines plot type from data
+  - Returns base64-encoded images
+
+- **`time_series.py`**
+  - Time series plot generation
+  - Line plots for temporal data
+
+- **`histogram.py`**
+  - Distribution plots
+  - Histogram generation
+
+- **`static_plots.py`**
+  - Static visualizations
+  - Bar charts, scatter plots, etc.
+
+---
+
+### `/tests/` - Test Suite
+
+- **`api_test.py`** - API endpoint tests
+- **`architect_test.py`** - Architect agent tests
+- **`analyst_test.py`** - Analyst agent tests
+- **`workflow_test.py`** - End-to-end workflow tests
+- **`plot_utils_test.py`** - Visualization tests
+- **`notation_test.py`** - Configuration notation tests
+- **`config.json`** / **`data.json`** - Test fixtures
+
+---
+
+## Key Flows
+
+### 1. Create New Simulation
+
+```
+Frontend → POST /simulations/ {"prompt": "..."}
+  ↓
+SimulationManager.add_simulation()
+  ↓ (generates title via LLM)
+Return SimulationState (status: PENDING)
+```
+
+### 2. Run Complete Simulation Pipeline
+
+```
+POST /architect/{id}
+  ↓
+Background: run_architect()
+  ↓ (AI designs configuration)
+Status: COMPLETED_CONFIG
+  ↓
+POST /simulator/{id}
+  ↓
+Background: run_simulator()
+  ↓ (Runs multi-agent simulation)
+Status: COMPLETED_SIMULATION
+  ↓
+POST /analyst/{id}
+  ↓
+Background: run_analyst()
+  ↓ (Analyzes results)
+Status: COMPLETED_ANALYSIS
+```
+
+### 3. Stream Real-Time Updates
+
+```
+GET /simulations/{id}/stream
+  ↓
+Server-Sent Events (SSE)
+  ↓
+Events: connection, update, heartbeat, end, error
+  ↓
+Frontend receives real-time state changes
+```
+
+---
+
+## Technology Stack
+
+### Backend
+- **FastAPI** - Modern async web framework
+- **Uvicorn** - ASGI server
+- **Pydantic** - Data validation and serialization
+- **OpenAI SDK** - LLM API client (works with OpenRouter)
+- **Rich** - Terminal formatting and logging
+- **Agents Library** - Custom agent framework with tool calling
+
+### Agent Models
+- Uses **OpenRouter** as LLM provider
+- Supports multiple models (GPT-4, Claude, etc.)
+- Configurable per agent type (Architect, Simulator, Analyst)
+
+---
+
+## Environment Configuration
+
+Required `.env` variables:
+
+```bash
+# OpenRouter API
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_API_KEY=your_api_key_here
+
+# CORS (frontend URLs)
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3003
+```
+
+---
+
+## API Lifecycle States
+
+Simulations progress through these states:
+
+1. `PENDING` - Created, waiting to start
+2. `PROCESSING_CONFIG` - Architect generating configuration
+3. `COMPLETED_CONFIG` - Configuration ready
+4. `PROCESSING_SIMULATION` - Running simulation
+5. `COMPLETED_SIMULATION` - Simulation complete
+6. `PROCESSING_ANALYSIS` - Generating report
+7. `COMPLETED_ANALYSIS` - Fully complete
+8. `FAILED` - Error occurred
+
+---
+
+## Real-Time Updates
+
+The system uses **callbacks** to propagate state changes:
+
+1. `ArchitectCallback` - Updates config and sources during design
+2. `SimulatorCallback` - Updates data as simulation runs
+3. `AnalystCallback` - Updates analysis as report is written
+
+These callbacks update the `SimulationManager`'s in-memory state, which is then streamed to frontend via SSE.
+
+---
+
+## Frontend Structure (To Be Completed)
+
+**Note:** Frontend directory structure needed. Please provide:
+- Frontend framework (React, Vue, Svelte, etc.)
+- Key components and their purposes
+- State management approach
+- API service layer structure
+- Routing structure
+
+Once provided, this section will be completed with:
+- Component hierarchy
+- Service/API integration layer
+- State management flow
+- UI/UX structure
+- Key user flows
+
+---
+
+## Development Setup
+
+### Backend Setup
+
+1. Create virtual environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Create `.env` file with required variables
+
+4. Run server:
+```bash
+python3 run.py
+```
+
+Server runs on `http://localhost:8000`
+API docs at `http://localhost:8000/docs`
+
+---
+
+## Key Design Patterns
+
+1. **Agent-Based Architecture** - Three specialized AI agents for different tasks
+2. **Callback Pattern** - Real-time state updates during long-running operations
+3. **Background Tasks** - Non-blocking execution for heavy computations
+4. **Server-Sent Events** - Real-time streaming to frontend
+5. **Dependency Injection** - Clean separation of concerns in API layer
+6. **Tool-Based Agents** - LLMs with function calling for structured operations
+
+---
+
+## Future Considerations
+
+- Database persistence (currently in-memory)
+- User authentication/authorization
+- Simulation result caching
+- Multi-user support
+- Simulation versioning
+- Export/import configurations
+- Collaborative editing
+

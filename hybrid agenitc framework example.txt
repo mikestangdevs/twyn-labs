@@ -1,0 +1,25 @@
+
+– write your own core agents — don’t mess with model weights, lock in system prompts that basically run the show. they handle task flow, interaction rules, and summarizing outputs. this gives control + custom feel without going crazy deep.
+
+– hybrid stack is the move — Use GPT Operator AND Claude agents to spin up personas (for you it could be permitting manager, grid planner, etc). but then we have a core “overseer” agent that runs the flow, routes tasks, and summarizes everything. that balance works super well.
+
+– you don’t have to go full Pinecone/SQL stack yet — honestly light metadata tagging + something like pgvector in Supabase works early on. for routing/orchestration: lightweight scripts and  upgraded as stableization is needed. crewAI / LangChain works too if you want modularity quick.
+
+– key is workflow realism > model fanciness — focus first on making agents that behave like real stakeholders in the energy bid process (devs, utilities, regulators). cool NLP tricks and fancy infra don't always show their true colors, but can be picked up with a good eye.
+
+so yeah there’s definitely a clean middle path between basic PoC and crazy infra. custom prompts + modular tools + light router = sweet spot early on.
+
+
+
+SIDE NOTE: if you’re thinking about NLP + fancy infra later, here’s how I’d bake it in early without overbuilding:
+
+– make all your agents + workflows modular from day 1. like, clear roles/inputs/outputs so you can swap brains later without rewiring everything.
+
+– store stuff in a vector-friendly DB off the bat (supabase + pgvector is easy). even if you don’t use vector search now, future you can drop it in clean.
+
+– don’t hardcode who talks to who. use an orchestrator early (GPT Operator)
+
+– log everything. agent convos, decisions, handoffs, timestamps. trust me - for future analytics, memory, debugging will be way easier.
+
+basically: light infra, clean design now = smooth upgrades later. no need to wire it all today, just set the bones right.
+
