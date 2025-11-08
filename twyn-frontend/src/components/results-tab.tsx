@@ -113,12 +113,25 @@ export default function ResultsTab({ simulationState }: { simulationState: Simul
       });
       
       // Convert markdown to proper HTML comprehensively
+      // First, normalize line endings and clean up
       processedContent = processedContent
-        // Headers (process from most specific to least specific)
-        .replace(/^#### (.*?)$/gm, '<h4>$1</h4>')
-        .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
-        .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
-        .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+      
+      // Process headers FIRST before anything else (with flexible spacing)
+      processedContent = processedContent
+        .replace(/^####\s+(.*?)$/gm, '<h4>$1</h4>')
+        .replace(/^###\s+(.*?)$/gm, '<h3>$1</h3>')
+        .replace(/^##\s+(.*?)$/gm, '<h2>$1</h2>')
+        .replace(/^#\s+(.*?)$/gm, '<h1>$1</h1>')
+        // Also catch headers without space after #
+        .replace(/^####([^\s].*?)$/gm, '<h4>$1</h4>')
+        .replace(/^###([^\s].*?)$/gm, '<h3>$1</h3>')
+        .replace(/^##([^\s].*?)$/gm, '<h2>$1</h2>')
+        .replace(/^#([^\s].*?)$/gm, '<h1>$1</h1>');
+      
+      // Now process other markdown
+      processedContent = processedContent
         // Code blocks (preserve them before other processing)
         .replace(/```[\s\S]*?```/g, (match) => {
           const code = match.replace(/```\w*\n?/g, '').trim();
@@ -142,7 +155,7 @@ export default function ResultsTab({ simulationState }: { simulationState: Simul
         // Lists (ordered)
         .replace(/^\d+\. (.*?)$/gm, '<li>$1</li>')
         // Wrap consecutive <li> in <ul> or <ol>
-        .replace(/(<li>.*?<\/li>(\n|<br>)*)+/g, (match) => {
+        .replace(/(<li>.*?<\/li>(\n)*)+/g, (match) => {
           return '<ul>' + match + '</ul>';
         })
         // Blockquotes
@@ -150,27 +163,28 @@ export default function ResultsTab({ simulationState }: { simulationState: Simul
         // Horizontal rules
         .replace(/^---$/gm, '<hr>')
         .replace(/^\*\*\*$/gm, '<hr>')
-        // Line breaks and paragraphs (do this last)
+        // Convert double newlines to paragraph breaks
         .replace(/\n\n+/g, '</p><p>')
+        // Single newlines become line breaks
         .replace(/\n/g, '<br>')
-        // Wrap in paragraph tags
-        .replace(/^(?!<[h|u|o|p|b|d])/gm, '<p>')
-        .replace(/(?<!>)$/gm, '</p>')
-        // Clean up excessive paragraph tags around block elements
-        .replace(/<p>(<h[1-6]>)/g, '$1')
-        .replace(/(<\/h[1-6]>)<\/p>/g, '$1')
-        .replace(/<p>(<ul>)/g, '$1')
-        .replace(/(<\/ul>)<\/p>/g, '$1')
-        .replace(/<p>(<ol>)/g, '$1')
-        .replace(/(<\/ol>)<\/p>/g, '$1')
-        .replace(/<p>(<blockquote>)/g, '$1')
-        .replace(/(<\/blockquote>)<\/p>/g, '$1')
-        .replace(/<p>(<pre>)/g, '$1')
-        .replace(/(<\/pre>)<\/p>/g, '$1')
-        .replace(/<p>(<hr>)/g, '$1')
-        .replace(/(<hr>)<\/p>/g, '$1')
-        .replace(/<p><\/p>/g, '')  // Remove empty paragraphs
-        .replace(/<p><br><\/p>/g, '');  // Remove paragraphs with just br
+        // Wrap content in paragraphs (but not headers or other block elements)
+        .split(/<(h[1-6]|ul|ol|pre|blockquote|hr)>/)
+        .map((chunk, index) => {
+          // Every odd index is a tag name, skip it
+          if (index % 2 === 1) return '<' + chunk + '>';
+          // Even indices are content between tags
+          if (chunk.trim() && !chunk.startsWith('</')) {
+            return '<p>' + chunk + '</p>';
+          }
+          return chunk;
+        })
+        .join('')
+        // Clean up excessive tags
+        .replace(/<p><\/p>/g, '')
+        .replace(/<p>\s*<br>\s*<\/p>/g, '')
+        .replace(/<p>(<\/[^>]+>)/g, '$1')
+        .replace(/(<h[1-6]>.*?<\/h[1-6]>)<\/p>/g, '$1')
+        .replace(/<p>(<h[1-6]>)/g, '$1');
       
       // Create a print-friendly HTML document
       printWindow.document.write(`
@@ -187,11 +201,37 @@ export default function ResultsTab({ simulationState }: { simulationState: Simul
                 padding: 40px 20px;
                 color: #333;
               }
-              h1 { font-size: 28px; margin-top: 0; border-bottom: 2px solid #000; padding-bottom: 10px; }
-              h2 { font-size: 22px; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-              h3 { font-size: 18px; margin-top: 20px; }
-              p { margin: 10px 0; }
-              strong { font-weight: 600; }
+              h1 { 
+                font-size: 28px; 
+                font-weight: 700; 
+                margin: 30px 0 20px 0; 
+                border-bottom: 2px solid #000; 
+                padding-bottom: 10px; 
+                line-height: 1.3;
+              }
+              h1:first-child { margin-top: 0; }
+              h2 { 
+                font-size: 22px; 
+                font-weight: 700; 
+                margin: 30px 0 15px 0; 
+                border-bottom: 1px solid #ccc; 
+                padding-bottom: 8px; 
+                line-height: 1.3;
+              }
+              h3 { 
+                font-size: 18px; 
+                font-weight: 700; 
+                margin: 25px 0 12px 0; 
+                line-height: 1.3;
+              }
+              h4 { 
+                font-size: 16px; 
+                font-weight: 600; 
+                margin: 20px 0 10px 0; 
+                line-height: 1.3;
+              }
+              p { margin: 12px 0; line-height: 1.6; }
+              strong { font-weight: 700; }
               pre { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; }
               code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 14px; }
               pre code { background: none; padding: 0; }
