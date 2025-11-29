@@ -8,14 +8,17 @@ When trying to reuse a configuration in production (`https://www.twyn.it`), the 
 
 2. **500 Internal Server Error**: `POST https://api.twyn.it/simulations/ net::ERR_FAILED 500 (Internal Server Error)`
 
-## Root Cause
+3. **Database Schema Error**: `Could not find the 'queue_priority' column of 'simulations' in the schema cache`
+
+## Root Causes
+
+### Issue 1: CORS Headers Missing on Error Responses
 
 When an unhandled exception occurred in the FastAPI backend, the CORS middleware didn't add CORS headers to the error response. This is a known issue with FastAPI/Starlette - middleware doesn't process error responses from unhandled exceptions unless exception handlers are explicitly defined.
 
-The 500 error was likely caused by:
-- Database connection issues
-- JWT verification failures
-- Missing error handling in the `create_simulation` endpoint
+### Issue 2: Database Schema Mismatch
+
+The backend code was trying to insert a `queue_priority` column into the `simulations` table, but this column doesn't exist in the production database schema. The `queue_priority` field is only used for in-memory queue management and doesn't need to be persisted.
 
 ## Solution
 
@@ -64,7 +67,38 @@ Added comprehensive try-except blocks:
 - **Logging**: Added detailed logging at each step for better debugging
 - **Catch-all Handler**: Added outer try-except to ensure no unhandled exceptions
 
-### 3. Improved Logging
+### 3. Fixed Database Schema Mismatch (`database.py`)
+
+Removed `queue_priority` from the database insert operation:
+
+```python
+# Before (causing error):
+response = self.client.table('simulations').insert({
+    'id': simulation_id,
+    'user_id': user_id,
+    'title': title,
+    'prompt': prompt,
+    'status': status,
+    'scenario_id': scenario_id,
+    'queue_priority': queue_priority,  # ❌ Column doesn't exist
+    'created_at': datetime.utcnow().isoformat()
+}).execute()
+
+# After (fixed):
+response = self.client.table('simulations').insert({
+    'id': simulation_id,
+    'user_id': user_id,
+    'title': title,
+    'prompt': prompt,
+    'status': status,
+    'scenario_id': scenario_id,
+    'created_at': datetime.utcnow().isoformat()
+}).execute()
+```
+
+The `queue_priority` parameter is still accepted by the function and logged, but it's only used for in-memory queue prioritization and not persisted to the database.
+
+### 4. Improved Logging
 
 Added logging statements to track:
 - User authentication flow
@@ -84,6 +118,10 @@ Added logging statements to track:
    - Added logging for each operation
    - Added explicit error handling for simulation creation
    - Added catch-all exception handler
+
+3. **`twyn-backend/src/api/database.py`**
+   - Removed `queue_priority` from database insert
+   - Updated logging message to clarify it's in-memory only
 
 ## Testing
 
@@ -114,35 +152,28 @@ To verify the fix works:
 
 ## Deployment
 
-The fix is ready to deploy to production:
+The fix has been deployed to production:
 
-1. **Commit Changes**:
-   ```bash
-   git add twyn-backend/src/api/main.py twyn-backend/src/api/routes/simulations.py
-   git commit -m "Fix CORS and 500 errors for config reuse
+**Commits:**
+1. `91828e5` - Fix CORS and 500 errors for config reuse
+2. `cc28032` - Fix queue_priority column error
 
-- Add global exception handlers to ensure CORS headers on all error responses
-- Add comprehensive error handling in create_simulation endpoint
-- Add detailed logging for debugging production issues
-"
-   ```
-
-2. **Deploy to Production**:
-   - Push to main/master branch
-   - Railway will automatically deploy
-   - Verify deployment completes successfully
-
-3. **Verify in Production**:
-   - Test config reuse feature
-   - Check logs for any remaining errors
-   - Monitor error rates
+**Status:** ✅ Deployed to Railway
 
 ## Expected Behavior After Fix
 
 1. **CORS Headers Present**: All responses (success or error) will include proper CORS headers
 2. **Better Error Messages**: Frontend will receive detailed error messages instead of generic CORS errors
 3. **Improved Debugging**: Backend logs will show exactly where errors occur
-4. **No More 500 Errors**: Common error cases are now properly handled
+4. **No Database Schema Errors**: Config reuse will work without queue_priority column errors
+5. **Successful Config Cloning**: Users can now successfully clone simulation configurations
+
+## Verification Results
+
+✅ **API Health**: `https://api.twyn.it/simulations/health` returns healthy  
+✅ **CORS Headers**: Present on error responses (401, 500)  
+✅ **Preflight Requests**: OPTIONS requests succeed with proper headers  
+✅ **Database Schema**: queue_priority no longer causes insert errors
 
 ## Prevention
 
@@ -152,15 +183,18 @@ To prevent similar issues in the future:
 2. **Comprehensive Error Handling**: Wrap all external operations (DB, API calls) in try-except
 3. **Detailed Logging**: Log all errors with stack traces for production debugging
 4. **Test Error Paths**: Test endpoints with invalid inputs to verify error handling
+5. **Schema Validation**: Ensure backend code matches database schema before deploying
+6. **Add Database Migrations**: When adding new columns, create and run migrations
 
 ## Additional Notes
 
 - The exception handlers use the `origin` header from the request to set the CORS header, which is more secure than using `*`
 - All errors are logged with full stack traces (`exc_info=True`) for debugging
-- The fix doesn't change any business logic, only error handling
+- The fix doesn't change any business logic, only error handling and database operations
 - The CORS configuration itself was correct; the issue was unhandled exceptions
+- The `queue_priority` field is still used in memory for queue management but is not persisted to the database
 
 ## Status
 
-✅ **FIXED** - Ready for production deployment
+✅ **FIXED** - Deployed to production and verified working
 
